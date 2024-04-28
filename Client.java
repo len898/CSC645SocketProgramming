@@ -5,8 +5,12 @@ class TextClient {
     public static void main(String argv[]) throws Exception {
         String username;
         String password;
-        String serverResponse;
+        String messageRecipient;
+        String messageBody;
+        Boolean loggedIn = false;
         Integer loginResponse;
+        Integer checkValue;
+        Integer numberOfMessages;
         BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
         Socket clientSocket = new Socket("127.0.0.1", 8000);
         DataOutputStream outToServer = new DataOutputStream(clientSocket.getOutputStream());
@@ -40,10 +44,11 @@ class TextClient {
                             outToServer.writeBytes(option + '\n');
                         } else {
                             System.out.println("Access Granted");
+                            loggedIn = true;
                             break;
                         }
                     }
-                    System.out.println("-----------------");
+                    System.out.println("-----------------" + '\n');
                     break;
                 case "1":
                     System.out.println("System Users");
@@ -53,16 +58,40 @@ class TextClient {
                         currName = inFromServer.readLine();
                         System.out.println(currName);
                     }
-                    System.out.println("-----------------");
+                    System.out.println("-----------------" + '\n');
                     break;
                 case "2":
-                    
-                    break;
+                    if (loggedIn) {
+                        System.out.print("Who would you like to send a message to: ");
+                        messageRecipient = inFromUser.readLine();
+                        outToServer.writeBytes(messageRecipient + '\n');
+                        checkValue = inFromServer.read();
+                        if (checkValue == 0) {
+                            System.out.println("Invalid Recipient Entered");
+                            break;
+                        }
+                        System.out.print("Enter the message: ");
+                        messageBody = inFromUser.readLine();
+                        outToServer.writeBytes(messageBody + '\n');
+                        System.out.println("Message sent succesfully");
+                        System.out.println("-------------------");
+                        break;
+                    } else {
+                        System.out.println("Please Connect to the Server before sending a message");
+                        break;
+                    }
 
                 case "3":
-                    clientSocket.close();
-                    break;
-
+                    if (loggedIn) {
+                        numberOfMessages = inFromServer.read();
+                        for (int i = 0; i < numberOfMessages; i++) {
+                            System.out.println(inFromServer.readLine());
+                        }
+                        break;
+                    } else {
+                        System.out.println("Please Connect to the Server before Getting messages");
+                        break;
+                    }
                 case "4":
                     clientSocket.close();
                     break;
