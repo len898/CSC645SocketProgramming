@@ -7,28 +7,23 @@ import java.util.ArrayList;
 import java.util.Dictionary;
 import java.util.Enumeration;
 
-class TextServer {
-    public static void main(String argv[]) throws Exception {
-        Dictionary<String, String> logins = new Hashtable<>();
-        Dictionary<String, List<String>> messages = new Hashtable<>();
-        logins.put("Lennart", "Password");
-        messages.put("Lennart", new ArrayList<String>());
-        logins.put("Alice", "1234");
-        messages.put("Alice", new ArrayList<String>());
-        logins.put("Bob", "5678");
-        messages.put("Bob", new ArrayList<String>());
-        ServerSocket welcomeSocket = new ServerSocket(8000);
-        System.out.println("SERVER is running ... ");
+class ClientServerConnection extends Thread {
+    Socket connectionSocket;
+    BufferedReader inFromClient;
+    DataOutputStream outToClient;
+    Boolean loggedIn = false;
+    String clientUsername = null;
+    String clientPassword;
+    String option;
 
-        while (true) {
-            Socket connectionSocket = welcomeSocket.accept();
-            BufferedReader inFromClient = new BufferedReader(new InputStreamReader(connectionSocket.getInputStream()));
-            DataOutputStream outToClient = new DataOutputStream(connectionSocket.getOutputStream());
-            Boolean loggedIn = false;
-            String clientUsername = null;
-            String clientPassword;
-            String option;
+    public ClientServerConnection(Socket passedSocket) throws Exception {
+        connectionSocket = passedSocket;
+        inFromClient = new BufferedReader(new InputStreamReader(connectionSocket.getInputStream()));
+        outToClient = new DataOutputStream(connectionSocket.getOutputStream());
+    }
 
+    public void run() {
+        try {
             while (true) {
                 System.out.println("waiting...");
 
@@ -38,8 +33,8 @@ class TextServer {
                     case "0":
                         clientUsername = inFromClient.readLine();
                         clientPassword = inFromClient.readLine();
-                        if (logins.get(clientUsername) != null
-                                && logins.get(clientUsername).equals(clientPassword)) {
+                        if (TextServer.logins.get(clientUsername) != null
+                                && TextServer.logins.get(clientUsername).equals(clientPassword)) {
                             outToClient.writeByte(1);
                             loggedIn = true;
                         } else {
@@ -47,9 +42,9 @@ class TextServer {
                         }
                         break;
                     case "1":
-                        Integer numUsers = logins.size();
+                        Integer numUsers = TextServer.logins.size();
                         outToClient.writeByte(numUsers);
-                        Enumeration<String> enu = logins.keys();
+                        Enumeration<String> enu = TextServer.logins.keys();
                         while (enu.hasMoreElements()) {
                             System.out.println("In the loop");
                             outToClient.writeBytes(enu.nextElement() + '\n');
@@ -59,24 +54,24 @@ class TextServer {
                         if (loggedIn) {
                             String messageRecipient = inFromClient.readLine();
                             // Need to check whether the recipient is valid
-                            if (logins.get(messageRecipient) == null) {
+                            if (TextServer.logins.get(messageRecipient) == null) {
                                 outToClient.writeByte(0);
                                 break;
                             } else {
                                 outToClient.writeByte(1);
                             }
                             String messageContent = inFromClient.readLine();
-                            messages.get(messageRecipient).add(clientUsername + ": " + messageContent);
+                            TextServer.messages.get(messageRecipient).add(clientUsername + ": " + messageContent);
                             System.out.println("Made it to the end");
                         }
                         break;
                     case "3":
-                        if(loggedIn){
-                            List<String> userMessages = messages.get(clientUsername);
-                            //Let the client know how many messages to expect.
+                        if (loggedIn) {
+                            List<String> userMessages = TextServer.messages.get(clientUsername);
+                            // Let the client know how many messages to expect.
                             outToClient.writeByte(userMessages.size());
                             Iterator<String> iter = userMessages.listIterator();
-                            while(iter.hasNext()){
+                            while (iter.hasNext()) {
                                 outToClient.writeBytes(iter.next() + "\n");
                             }
                             break;
@@ -90,6 +85,31 @@ class TextServer {
                     break;
                 }
             }
+        } catch (Exception e) {
+            System.out.println("Multithreading Exception");
+        }
+    }
+}
+
+class TextServer {
+    public static Dictionary<String, String> logins = new Hashtable<>();
+    public static Dictionary<String, List<String>> messages = new Hashtable<>();
+
+    public static void main(String argv[]) throws Exception {
+
+        logins.put("Lennart", "Password");
+        messages.put("Lennart", new ArrayList<String>());
+        logins.put("Alice", "1234");
+        messages.put("Alice", new ArrayList<String>());
+        logins.put("Bob", "5678");
+        messages.put("Bob", new ArrayList<String>());
+        ServerSocket welcomeSocket = new ServerSocket(8000);
+        System.out.println("SERVER is running ... ");
+
+        while (true) {
+            Socket connectionSocket = welcomeSocket.accept();
+            ClientServerConnection conn = new ClientServerConnection(connectionSocket);
+            conn.start();
         }
     }
 }
